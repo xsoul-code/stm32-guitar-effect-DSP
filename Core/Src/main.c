@@ -32,7 +32,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define WM8731_I2C_ADDR (0x1A << 1)
+#define WM8731_REG_RESET   15
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -67,35 +68,52 @@ void MX_USB_HOST_Process(void);
 /* USER CODE BEGIN 0 */
 
 void rainbowLED() {
+	int howFast = 100;
 	for(int i = 0; i < 3; i++) {
 		GPIOD->ODR |= (1 << 12);
-		HAL_Delay(100);
+		HAL_Delay(howFast);
 		GPIOD->ODR &=~ (1 << 12);
-		HAL_Delay(100);
+		HAL_Delay(howFast);
 		GPIOD->ODR |= (1 << 13);
-		HAL_Delay(100);
+		HAL_Delay(howFast);
 		GPIOD->ODR &=~ (1 << 13);
-		HAL_Delay(100);
+		HAL_Delay(howFast);
 		GPIOD->ODR |= (1 << 14);
-		HAL_Delay(100);
+		HAL_Delay(howFast);
 		GPIOD->ODR &=~ (1 << 14);
-		HAL_Delay(100);
+		HAL_Delay(howFast);
 		GPIOD->ODR |= (1 << 15);
-		HAL_Delay(100);
+		HAL_Delay(howFast);
 		GPIOD->ODR &=~ (1 << 15);
-		HAL_Delay(100);
-	}
+		HAL_Delay(howFast);
+		GPIOD->ODR |= (1 << 12);
+		HAL_Delay(howFast);
+		GPIOD->ODR &=~ (1 << 12);
+		HAL_Delay(howFast);
+		GPIOD->ODR |= (1 << 15);
+		HAL_Delay(howFast);
+		GPIOD->ODR &=~ (1 << 15);
+		HAL_Delay(howFast);
+		GPIOD->ODR |= (1 << 14);
+		HAL_Delay(howFast);
+		GPIOD->ODR &=~ (1 << 14);
+		HAL_Delay(howFast);
+		GPIOD->ODR |= (1 << 13);
+		HAL_Delay(howFast);
+		GPIOD->ODR &=~ (1 << 13);
+		HAL_Delay(howFast);
+}
 	for(int i = 0; i < 3; i++) {
 		GPIOD->ODR |= (1 << 12);
 		GPIOD->ODR |= (1 << 13);
 		GPIOD->ODR |= (1 << 14);
 		GPIOD->ODR |= (1 << 15);
-		HAL_Delay(200);
+		HAL_Delay(100);
 		GPIOD->ODR &=~ (1 << 12);
 		GPIOD->ODR &=~ (1 << 13);
 		GPIOD->ODR &=~ (1 << 14);
 		GPIOD->ODR &=~ (1 << 15);
-		HAL_Delay(200);
+		HAL_Delay(100);
 	}
 }
 
@@ -106,11 +124,20 @@ void redBAD() {
 	HAL_Delay(200);
 }
 
-void WM8731_WriteReg(I2C_HandleTypeDef *hi2c, uint8_t reg, uint16_t data) {
+HAL_StatusTypeDef WM8731_WriteReg(I2C_HandleTypeDef *hi2c, uint8_t reg, uint16_t data) {
 	uint8_t bytes[2];
 	bytes[0] = (reg << 1) | ((data >> 8) & 0x01);
 	bytes[1] = data & 0xFF;
-	HAL_I2C_Master_Transmit(hi2c, 0x01 << 1, bytes, 2, 100);
+	return HAL_I2C_Master_Transmit(hi2c, WM8731_I2C_ADDR, bytes, 2, 100);
+}
+
+HAL_StatusTypeDef WM8731_Init(I2C_HandleTypeDef* hi2c) {
+	HAL_StatusTypeDef st = WM8731_WriteReg(hi2c, WM8731_REG_RESET, 0x000);
+	if (!st == HAL_OK) {
+		return st;
+	}
+	HAL_Delay(5); // Krótki delay dla biasów codeca
+	return HAL_OK;
 }
 
 /* USER CODE END 0 */
@@ -121,11 +148,8 @@ void WM8731_WriteReg(I2C_HandleTypeDef *hi2c, uint8_t reg, uint16_t data) {
   */
 int main(void)
 {
+
   /* USER CODE BEGIN 1 */
-	GPIOD->MODER |= (1 << 24);  // PD12 jako output
-	GPIOD->MODER |= (1 << 26);  // PD13 jako output
-	GPIOD->MODER |= (1 << 28);  // PD14 jako output
-	GPIOD->MODER |= (1 << 30);  // PD15 jako output
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -151,7 +175,7 @@ int main(void)
   MX_SPI1_Init();
   MX_USB_HOST_Init();
   /* USER CODE BEGIN 2 */
-
+  WM8731_Init(&hi2c1); // TODO: panic LED on failure
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -167,7 +191,7 @@ int main(void)
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET); // zielona
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET); // czerwona
 
-	if (HAL_I2C_IsDeviceReady(&hi2c1, 0x1A << 1, 1, 10) == HAL_OK) {
+	if (HAL_I2C_IsDeviceReady(&hi2c1, WM8731_I2C_ADDR, 1, 10) == HAL_OK) {
 		// codec odpowiada — zielona
 		rainbowLED();
 	} else {
