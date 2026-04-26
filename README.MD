@@ -1,6 +1,7 @@
 # Wireless Digital Guitar Effects Pedal — STM32 Firmware
 
 Bachelor's thesis project (Politechnika Krakowska, WIEiK) — a wireless digital guitar effects pedal built on STM32F407VG. This is part of a dual MCU STM32 + ESP32 (Iot) and external I2S codec WM8731 system which involves passthrough audio digital signal processing (DSP) from electric guitar with wireless control and analysis (FFT, Graphs etc.).
+This repository is work in progress. Final version may differ from initial plan.
 
 ## Architecture 
 
