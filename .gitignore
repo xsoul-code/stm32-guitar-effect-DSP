@@ -1,0 +1,9 @@
+Debug/
+Release/
+.metadata/
+.DS_Store
+Thumbs.db
+hs_err_pid31204.log
+*.launch
+hs_err_pid31204.log
+*.launch
