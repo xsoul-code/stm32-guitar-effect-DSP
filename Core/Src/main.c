@@ -33,7 +33,17 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define WM8731_I2C_ADDR (0x1A << 1)
-#define WM8731_REG_RESET   15
+#define WM8731_REG_LLINEIN      0x00
+#define WM8731_REG_RLINEIN      0x01
+#define WM8731_REG_LHPOUT       0x02
+#define WM8731_REG_RHPOUT       0x03
+#define WM8731_REG_ANALOG_PATH  0x04
+#define WM8731_REG_DIGITAL_PATH 0x05
+#define WM8731_REG_PWR_DOWN     0x06
+#define WM8731_REG_DIGITAL_IF   0x07
+#define WM8731_REG_SAMPLING     0x08
+#define WM8731_REG_ACTIVE       0x09
+#define WM8731_REG_RESET        0x0F
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -45,19 +55,24 @@
 I2C_HandleTypeDef hi2c1;
 
 I2S_HandleTypeDef hi2s3;
+DMA_HandleTypeDef hdma_spi3_tx;
+DMA_HandleTypeDef hdma_i2s3_ext_rx;
 
 SPI_HandleTypeDef hspi1;
 
 /* USER CODE BEGIN PV */
-
+#define I2S_BUF_HALFWORDS 512
+int16_t i2s_rx_buf[I2S_BUF_HALFWORDS];
+int16_t i2s_tx_buf[I2S_BUF_HALFWORDS];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_I2C1_Init(void);
-static void MX_I2S3_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_I2S3_Init(void);
 void MX_USB_HOST_Process(void);
 
 /* USER CODE BEGIN PFP */
@@ -67,7 +82,7 @@ void MX_USB_HOST_Process(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-void rainbowLED() {
+void rainbowLED() { // Rainbow circling LED effect
 	int howFast = 100;
 	for(int i = 0; i < 3; i++) {
 		GPIOD->ODR |= (1 << 12);
@@ -117,7 +132,7 @@ void rainbowLED() {
 	}
 }
 
-void redBAD() {
+void redBAD() { // Red LED blinking effect
 	GPIOD->ODR |= (1 << 14);
 	HAL_Delay(200);
 	GPIOD->ODR &=~ (1 << 14);
@@ -132,11 +147,52 @@ HAL_StatusTypeDef WM8731_WriteReg(I2C_HandleTypeDef *hi2c, uint8_t reg, uint16_t
 }
 
 HAL_StatusTypeDef WM8731_Init(I2C_HandleTypeDef* hi2c) {
+
+	// 1. Software codec reset
 	HAL_StatusTypeDef st = WM8731_WriteReg(hi2c, WM8731_REG_RESET, 0x000);
-	if (!st == HAL_OK) {
+	if (st != HAL_OK) {
 		return st;
 	}
-	HAL_Delay(5); // Krótki delay dla biasów codeca
+	HAL_Delay(5); // Short delay for audio codec internal biases
+
+	// 2. Power
+	st = WM8731_WriteReg(hi2c, WM8731_REG_PWR_DOWN, 0x000);
+	if (st != HAL_OK) return st;
+
+	// 3. LIne-in
+	st = WM8731_WriteReg(hi2c, WM8731_REG_LLINEIN, 0x11F);
+	if (st != HAL_OK) return st;
+	//st = WM8731_WriteReg(hi2c, WM8731_REG_RLINEIN, 0x01F);
+	//if (st != HAL_OK) return st;
+
+    // 4. Headphone-out: 0 dB (0x79), zero-cross detect on
+    st = WM8731_WriteReg(hi2c, WM8731_REG_LHPOUT, 0x1F9);
+    if (st != HAL_OK) return st;
+    st = WM8731_WriteReg(hi2c, WM8731_REG_RHPOUT, 0x1F9);
+    if (st != HAL_OK) return st;
+
+    st = WM8731_WriteReg(hi2c, WM8731_REG_ANALOG_PATH, 0x01A);
+    if (st != HAL_OK) return st;
+
+    st = WM8731_WriteReg(hi2c, WM8731_REG_DIGITAL_PATH, 0x000);
+    if (st != HAL_OK) return st;
+
+    st = WM8731_WriteReg(hi2c, WM8731_REG_DIGITAL_IF, 0x042);
+    if (st != HAL_OK) return st;
+
+    st = WM8731_WriteReg(hi2c, WM8731_REG_SAMPLING, 0x01C);
+	if (st != HAL_OK) return st;
+
+    st = WM8731_WriteReg(hi2c, WM8731_REG_ACTIVE, 0x001);
+    if (st != HAL_OK) return st;
+
+    st = WM8731_WriteReg(hi2c, WM8731_REG_PWR_DOWN, 0x000);
+    if (st != HAL_OK) return st;
+    HAL_Delay(100);
+
+    st = WM8731_WriteReg(hi2c, WM8731_REG_DIGITAL_PATH, 0x000);
+    if (st != HAL_OK) return st;
+
 	return HAL_OK;
 }
 
@@ -170,12 +226,24 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_I2C1_Init();
-  MX_I2S3_Init();
   MX_SPI1_Init();
   MX_USB_HOST_Init();
+  MX_I2S3_Init();
   /* USER CODE BEGIN 2 */
-  WM8731_Init(&hi2c1); // TODO: panic LED on failure
+  if (WM8731_Init(&hi2c1) != HAL_OK) {
+	  GPIOD->ODR |= (1 << 15);
+  }
+
+  if (HAL_I2SEx_TransmitReceive_DMA(&hi2s3,
+            (uint16_t*)i2s_tx_buf,
+            (uint16_t*)i2s_rx_buf,
+            I2S_BUF_HALFWORDS) != HAL_OK) {
+	  GPIOD->ODR |= (1 << 14);
+        Error_Handler();
+  }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -186,20 +254,8 @@ int main(void)
     MX_USB_HOST_Process();
 
     /* USER CODE BEGIN 3 */
-    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
-
-    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET); // zielona
-    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET); // czerwona
-
-	if (HAL_I2C_IsDeviceReady(&hi2c1, WM8731_I2C_ADDR, 1, 10) == HAL_OK) {
-		// codec odpowiada — zielona
-		rainbowLED();
-	} else {
-		// codec nie odpowiada — czerwona
-		redBAD();
-	}
-
-	HAL_Delay(500);
+    HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+    HAL_Delay(500);
 
 
   }
@@ -301,14 +357,14 @@ static void MX_I2S3_Init(void)
 
   /* USER CODE END I2S3_Init 1 */
   hi2s3.Instance = SPI3;
-  hi2s3.Init.Mode = I2S_MODE_MASTER_TX;
+  hi2s3.Init.Mode = I2S_MODE_SLAVE_TX;
   hi2s3.Init.Standard = I2S_STANDARD_PHILIPS;
   hi2s3.Init.DataFormat = I2S_DATAFORMAT_16B;
-  hi2s3.Init.MCLKOutput = I2S_MCLKOUTPUT_ENABLE;
+  hi2s3.Init.MCLKOutput = I2S_MCLKOUTPUT_DISABLE;
   hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_96K;
   hi2s3.Init.CPOL = I2S_CPOL_LOW;
   hi2s3.Init.ClockSource = I2S_CLOCK_PLL;
-  hi2s3.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_DISABLE;
+  hi2s3.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_ENABLE;
   if (HAL_I2S_Init(&hi2s3) != HAL_OK)
   {
     Error_Handler();
@@ -354,6 +410,25 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
 
 }
 
@@ -459,7 +534,23 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_I2SEx_TxRxHalfCpltCallback(I2S_HandleTypeDef *hi2s) {
+        if (hi2s->Instance == SPI3) {
+                HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
+                for (int i = 0; i < I2S_BUF_HALFWORDS / 2; i++) {
+                        i2s_tx_buf[i] = i2s_rx_buf[i];
+                }
+        }
+  }
 
+void HAL_I2SEx_TxRxCpltCallback(I2S_HandleTypeDef *hi2s) {
+	if (hi2s->Instance == SPI3) {
+			HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
+			for (int i = I2S_BUF_HALFWORDS / 2; i < I2S_BUF_HALFWORDS; i++) {
+					i2s_tx_buf[i] = i2s_rx_buf[i];
+			}
+	}
+}
 /* USER CODE END 4 */
 
 /**
@@ -473,6 +564,7 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+
   }
   /* USER CODE END Error_Handler_Debug */
 }
