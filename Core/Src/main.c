@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "wm8731.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,18 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define WM8731_I2C_ADDR (0x1A << 1)
-#define WM8731_REG_LLINEIN      0x00
-#define WM8731_REG_RLINEIN      0x01
-#define WM8731_REG_LHPOUT       0x02
-#define WM8731_REG_RHPOUT       0x03
-#define WM8731_REG_ANALOG_PATH  0x04
-#define WM8731_REG_DIGITAL_PATH 0x05
-#define WM8731_REG_PWR_DOWN     0x06
-#define WM8731_REG_DIGITAL_IF   0x07
-#define WM8731_REG_SAMPLING     0x08
-#define WM8731_REG_ACTIVE       0x09
-#define WM8731_REG_RESET        0x0F
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -131,63 +120,6 @@ void redBAD() { // Red LED blinking effect
 	HAL_Delay(200);
 	GPIOD->ODR &=~ (1 << 14);
 	HAL_Delay(200);
-}
-
-HAL_StatusTypeDef WM8731_WriteReg(I2C_HandleTypeDef *hi2c, uint8_t reg, uint16_t data) {
-	uint8_t bytes[2];
-	bytes[0] = (reg << 1) | ((data >> 8) & 0x01);
-	bytes[1] = data & 0xFF;
-	return HAL_I2C_Master_Transmit(hi2c, WM8731_I2C_ADDR, bytes, 2, 100);
-}
-
-HAL_StatusTypeDef WM8731_Init(I2C_HandleTypeDef* hi2c) {
-
-	// 1. Software codec reset
-	HAL_StatusTypeDef st = WM8731_WriteReg(hi2c, WM8731_REG_RESET, 0x000);
-	if (st != HAL_OK) {
-		return st;
-	}
-	HAL_Delay(5); // Short delay for audio codec internal biases
-
-	// 2. Power
-	st = WM8731_WriteReg(hi2c, WM8731_REG_PWR_DOWN, 0x000);
-	if (st != HAL_OK) return st;
-
-	// 3. LIne-in
-	st = WM8731_WriteReg(hi2c, WM8731_REG_LLINEIN, 0x11F);
-	if (st != HAL_OK) return st;
-	//st = WM8731_WriteReg(hi2c, WM8731_REG_RLINEIN, 0x01F);
-	//if (st != HAL_OK) return st;
-
-    // 4. Headphone-out: 0 dB (0x79), zero-cross detect on
-    st = WM8731_WriteReg(hi2c, WM8731_REG_LHPOUT, 0x1F9);
-    if (st != HAL_OK) return st;
-    st = WM8731_WriteReg(hi2c, WM8731_REG_RHPOUT, 0x1F9);
-    if (st != HAL_OK) return st;
-
-    st = WM8731_WriteReg(hi2c, WM8731_REG_ANALOG_PATH, 0x01A);
-    if (st != HAL_OK) return st;
-
-    st = WM8731_WriteReg(hi2c, WM8731_REG_DIGITAL_PATH, 0x000);
-    if (st != HAL_OK) return st;
-
-    st = WM8731_WriteReg(hi2c, WM8731_REG_DIGITAL_IF, 0x042);
-    if (st != HAL_OK) return st;
-
-    st = WM8731_WriteReg(hi2c, WM8731_REG_SAMPLING, 0x01C);
-	if (st != HAL_OK) return st;
-
-    st = WM8731_WriteReg(hi2c, WM8731_REG_ACTIVE, 0x001);
-    if (st != HAL_OK) return st;
-
-    st = WM8731_WriteReg(hi2c, WM8731_REG_PWR_DOWN, 0x000);
-    if (st != HAL_OK) return st;
-    HAL_Delay(100);
-
-    st = WM8731_WriteReg(hi2c, WM8731_REG_DIGITAL_PATH, 0x000);
-    if (st != HAL_OK) return st;
-
-	return HAL_OK;
 }
 
 /* USER CODE END 0 */
