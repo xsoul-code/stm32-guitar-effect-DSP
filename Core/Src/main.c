@@ -85,57 +85,7 @@ static void Audio_Restart(void)
     WM8731_SyncInit(&hi2c1);
 }
 
-void rainbowLED() { // Rainbow circling LED effect
-	int howFast = 100;
-	for(int i = 0; i < 3; i++) {
-		GPIOD->ODR |= (1 << 12);
-		HAL_Delay(howFast);
-		GPIOD->ODR &=~ (1 << 12);
-		HAL_Delay(howFast);
-		GPIOD->ODR |= (1 << 13);
-		HAL_Delay(howFast);
-		GPIOD->ODR &=~ (1 << 13);
-		HAL_Delay(howFast);
-		GPIOD->ODR |= (1 << 14);
-		HAL_Delay(howFast);
-		GPIOD->ODR &=~ (1 << 14);
-		HAL_Delay(howFast);
-		GPIOD->ODR |= (1 << 15);
-		HAL_Delay(howFast);
-		GPIOD->ODR &=~ (1 << 15);
-		HAL_Delay(howFast);
-		GPIOD->ODR |= (1 << 12);
-		HAL_Delay(howFast);
-		GPIOD->ODR &=~ (1 << 12);
-		HAL_Delay(howFast);
-		GPIOD->ODR |= (1 << 15);
-		HAL_Delay(howFast);
-		GPIOD->ODR &=~ (1 << 15);
-		HAL_Delay(howFast);
-		GPIOD->ODR |= (1 << 14);
-		HAL_Delay(howFast);
-		GPIOD->ODR &=~ (1 << 14);
-		HAL_Delay(howFast);
-		GPIOD->ODR |= (1 << 13);
-		HAL_Delay(howFast);
-		GPIOD->ODR &=~ (1 << 13);
-		HAL_Delay(howFast);
-}
-	for(int i = 0; i < 3; i++) {
-		GPIOD->ODR |= (1 << 12);
-		GPIOD->ODR |= (1 << 13);
-		GPIOD->ODR |= (1 << 14);
-		GPIOD->ODR |= (1 << 15);
-		HAL_Delay(100);
-		GPIOD->ODR &=~ (1 << 12);
-		GPIOD->ODR &=~ (1 << 13);
-		GPIOD->ODR &=~ (1 << 14);
-		GPIOD->ODR &=~ (1 << 15);
-		HAL_Delay(100);
-	}
-}
-
-void redBAD() { // Red LED blinking effect
+void inline redBAD() { // Red LED blinking effect
 	GPIOD->ODR |= (1 << 14);
 	HAL_Delay(200);
 	GPIOD->ODR &=~ (1 << 14);
@@ -214,10 +164,11 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  // Codec presence check
   if (HAL_I2C_IsDeviceReady(&hi2c1, 0x1A << 1, 2, 10) != HAL_OK) {
-	  codec_was_lost = 1;            // kodek zniknął z magistrali
+	  codec_was_lost = 1;
   } else if (codec_was_lost) {
-	  codec_was_lost = 0;            // wrócił, konfiguruj od zera
+	  codec_was_lost = 0;
 	  Audio_Restart();
   }
 
