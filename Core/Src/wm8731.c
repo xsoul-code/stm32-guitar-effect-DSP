@@ -32,6 +32,15 @@ static HAL_StatusTypeDef WM8731_WriteReg(I2C_HandleTypeDef *hi2c, uint8_t reg, u
     return HAL_I2C_Master_Transmit(hi2c, WM8731_I2C_ADDR, bytes, 2, 100);
 }
 
+HAL_StatusTypeDef WM8731_SyncInit(I2C_HandleTypeDef *hi2c)
+{
+	HAL_StatusTypeDef st;
+	 st = WM8731_WriteReg(hi2c, WM8731_REG_ACTIVE, 0x001);
+	     if (st != HAL_OK) return st;
+	 HAL_Delay(100);
+	 return HAL_OK;
+}
+
 HAL_StatusTypeDef WM8731_Init(I2C_HandleTypeDef *hi2c)
 {
     HAL_StatusTypeDef st;
@@ -56,8 +65,8 @@ HAL_StatusTypeDef WM8731_Init(I2C_HandleTypeDef *hi2c)
     if (st != HAL_OK) return st;
 
     /* 5. Analog path: line-in to ADC, DAC to output, mic muted,
-          analog bypass enabled. */
-    st = WM8731_WriteReg(hi2c, WM8731_REG_ANALOG_PATH, 0x01A);
+          analog bypass disabled !0x012!. */
+    st = WM8731_WriteReg(hi2c, WM8731_REG_ANALOG_PATH, 0x012);
     if (st != HAL_OK) return st;
 
     /* 6. Digital path: no de-emphasis, no soft mute. */
@@ -73,8 +82,8 @@ HAL_StatusTypeDef WM8731_Init(I2C_HandleTypeDef *hi2c)
     if (st != HAL_OK) return st;
 
     /* 9. Activate digital core. */
-    st = WM8731_WriteReg(hi2c, WM8731_REG_ACTIVE, 0x001);
-    if (st != HAL_OK) return st;
+    //st = WM8731_WriteReg(hi2c, WM8731_REG_ACTIVE, 0x001);
+    //if (st != HAL_OK) return st;
 
     /* 10. Re-confirm power up, then settle. */
     st = WM8731_WriteReg(hi2c, WM8731_REG_PWR_DOWN, 0x000);
@@ -82,8 +91,8 @@ HAL_StatusTypeDef WM8731_Init(I2C_HandleTypeDef *hi2c)
     HAL_Delay(100);
 
     /* 11. Re-confirm digital path. */
-    st = WM8731_WriteReg(hi2c, WM8731_REG_DIGITAL_PATH, 0x000);
-    if (st != HAL_OK) return st;
+    //st = WM8731_WriteReg(hi2c, WM8731_REG_DIGITAL_PATH, 0x000);
+    //if (st != HAL_OK) return st;
 
     return HAL_OK;
 }

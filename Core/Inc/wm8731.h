@@ -20,6 +20,8 @@ extern "C" {
    I2S 16-bit, codec as master. Returns HAL_OK on success. */
 HAL_StatusTypeDef WM8731_Init(I2C_HandleTypeDef *hi2c);
 
+HAL_StatusTypeDef WM8731_SyncInit(I2C_HandleTypeDef *hi2c);
+
 #ifdef __cplusplus
 }
 #endif

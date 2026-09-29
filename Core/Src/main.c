@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "wm8731.h"
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,8 +49,9 @@ DMA_HandleTypeDef hdma_i2s3_ext_rx;
 
 /* USER CODE BEGIN PV */
 #define I2S_BUF_HALFWORDS 512
-int16_t i2s_rx_buf[I2S_BUF_HALFWORDS];
-int16_t i2s_tx_buf[I2S_BUF_HALFWORDS];
+volatile int16_t i2s_rx_buf[I2S_BUF_HALFWORDS];
+volatile int16_t i2s_tx_buf[I2S_BUF_HALFWORDS];
+static uint8_t codec_was_lost = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -64,6 +66,24 @@ static void MX_I2S3_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+static void Audio_Restart(void)
+{
+    HAL_I2S_DMAStop(&hi2s3);
+    memset((void*)i2s_tx_buf, 0, sizeof(i2s_tx_buf));
+    memset((void*)i2s_rx_buf, 0, sizeof(i2s_rx_buf));
+
+    WM8731_Init(&hi2c1);
+
+    __HAL_RCC_SPI3_FORCE_RESET();
+    __HAL_RCC_SPI3_RELEASE_RESET();
+    MX_I2S3_Init();
+
+    HAL_I2SEx_TransmitReceive_DMA(&hi2s3, (uint16_t*)i2s_tx_buf,
+                                  (uint16_t*)i2s_rx_buf, I2S_BUF_HALFWORDS);
+    HAL_Delay(10);
+    WM8731_SyncInit(&hi2c1);
+}
 
 void rainbowLED() { // Rainbow circling LED effect
 	int howFast = 100;
@@ -156,9 +176,20 @@ int main(void)
   MX_I2C1_Init();
   MX_I2S3_Init();
   /* USER CODE BEGIN 2 */
+
+  HAL_Delay(5);
+
+  memset((void*)i2s_tx_buf, 0, sizeof(i2s_tx_buf));
+  memset((void*)i2s_rx_buf, 0, sizeof(i2s_rx_buf));
+
   if (WM8731_Init(&hi2c1) != HAL_OK) {
 	  GPIOD->ODR |= (1 << 15);
   }
+
+  __HAL_RCC_SPI3_FORCE_RESET();
+  __HAL_RCC_SPI3_RELEASE_RESET();
+
+  MX_I2S3_Init();
 
   if (HAL_I2SEx_TransmitReceive_DMA(&hi2s3,
             (uint16_t*)i2s_tx_buf,
@@ -167,6 +198,12 @@ int main(void)
 	  GPIOD->ODR |= (1 << 14);
         Error_Handler();
   }
+
+  HAL_Delay(10);
+
+  if (WM8731_SyncInit(&hi2c1) != HAL_OK) {
+  	  GPIOD->ODR |= (1 << 15);
+    }
 
   /* USER CODE END 2 */
 
@@ -177,6 +214,14 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+  if (HAL_I2C_IsDeviceReady(&hi2c1, 0x1A << 1, 2, 10) != HAL_OK) {
+	  codec_was_lost = 1;            // kodek zniknął z magistrali
+  } else if (codec_was_lost) {
+	  codec_was_lost = 0;            // wrócił, konfiguruj od zera
+	  Audio_Restart();
+  }
+
+
     HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
     HAL_Delay(500);
 
