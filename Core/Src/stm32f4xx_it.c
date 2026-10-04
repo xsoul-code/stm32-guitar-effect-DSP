@@ -228,5 +228,10 @@ void DMA1_Stream5_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
+extern I2S_HandleTypeDef hi2s3;
 
+void SPI3_IRQHandler(void)
+{
+    HAL_I2S_IRQHandler(&hi2s3);
+}
 /* USER CODE END 1 */

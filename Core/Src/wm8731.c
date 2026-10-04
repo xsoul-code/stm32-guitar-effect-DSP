@@ -55,13 +55,13 @@ HAL_StatusTypeDef WM8731_Init(I2C_HandleTypeDef *hi2c)
     if (st != HAL_OK) return st;
 
     /* 3. Left line-in: unmute, set input volume. */
-    st = WM8731_WriteReg(hi2c, WM8731_REG_LLINEIN, 0x11F);
+    st = WM8731_WriteReg(hi2c, WM8731_REG_LLINEIN, 0x10F);
     if (st != HAL_OK) return st;
 
     /* 4. Headphone out L/R: 0 dB (0x79), zero-cross detect on. */
-    st = WM8731_WriteReg(hi2c, WM8731_REG_LHPOUT, 0x1F9);
+    st = WM8731_WriteReg(hi2c, WM8731_REG_LHPOUT, 0x1E5);
     if (st != HAL_OK) return st;
-    st = WM8731_WriteReg(hi2c, WM8731_REG_RHPOUT, 0x1F9);
+    st = WM8731_WriteReg(hi2c, WM8731_REG_RHPOUT, 0x1E5);
     if (st != HAL_OK) return st;
 
     /* 5. Analog path: line-in to ADC, DAC to output, mic muted,
@@ -78,7 +78,7 @@ HAL_StatusTypeDef WM8731_Init(I2C_HandleTypeDef *hi2c)
     if (st != HAL_OK) return st;
 
     /* 8. Sampling control: 96 kHz, normal mode. */
-    st = WM8731_WriteReg(hi2c, WM8731_REG_SAMPLING, 0x01C);
+    st = WM8731_WriteReg(hi2c, WM8731_REG_SAMPLING, 0x000);
     if (st != HAL_OK) return st;
 
     /* 9. Activate digital core. */

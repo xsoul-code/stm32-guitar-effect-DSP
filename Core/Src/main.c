@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "wm8731.h"
 #include <string.h>
+#include "audio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,10 +49,16 @@ DMA_HandleTypeDef hdma_spi3_tx;
 DMA_HandleTypeDef hdma_i2s3_ext_rx;
 
 /* USER CODE BEGIN PV */
-#define I2S_BUF_HALFWORDS 512
+#define I2S_BUF_HALFWORDS 256
 volatile int16_t i2s_rx_buf[I2S_BUF_HALFWORDS];
 volatile int16_t i2s_tx_buf[I2S_BUF_HALFWORDS];
-static uint8_t codec_was_lost = 0;
+static volatile uint8_t codec_was_lost = 0;
+
+volatile uint8_t  i2s_error_flag = 0;
+volatile uint32_t i2s_error_count = 0;
+volatile uint32_t i2s_last_error = 0;
+
+volatile uint32_t cnt_fre = 0, cnt_udr = 0, cnt_ovr = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -126,7 +133,9 @@ int main(void)
   MX_I2C1_Init();
   MX_I2S3_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_NVIC_SetPriority(SPI3_IRQn, 1, 0);
+  HAL_NVIC_EnableIRQ(SPI3_IRQn);
+  Distortion_Init();
   HAL_Delay(5);
 
   memset((void*)i2s_tx_buf, 0, sizeof(i2s_tx_buf));
@@ -164,17 +173,19 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  // Codec presence check
-  if (HAL_I2C_IsDeviceReady(&hi2c1, 0x1A << 1, 2, 10) != HAL_OK) {
-	  codec_was_lost = 1;
-  } else if (codec_was_lost) {
-	  codec_was_lost = 0;
-	  Audio_Restart();
-  }
-
+	  // I2S fail restart
+	  uint32_t sr3 = SPI3->SR;
+	  uint32_t srx = I2S3ext->SR;
+	  if (sr3 & SPI_SR_FRE) cnt_fre++;
+	  if (sr3 & SPI_SR_UDR) cnt_udr++;
+	  if (srx & SPI_SR_OVR) cnt_ovr++;
+	  if (cnt_fre) {
+	      cnt_fre = 0;
+	      Audio_Restart();
+	  }
 
     HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
-    HAL_Delay(500);
+    HAL_Delay(10);
 
 
   }
@@ -278,9 +289,9 @@ static void MX_I2S3_Init(void)
   hi2s3.Instance = SPI3;
   hi2s3.Init.Mode = I2S_MODE_SLAVE_TX;
   hi2s3.Init.Standard = I2S_STANDARD_PHILIPS;
-  hi2s3.Init.DataFormat = I2S_DATAFORMAT_16B;
+  hi2s3.Init.DataFormat = I2S_DATAFORMAT_16B_EXTENDED;
   hi2s3.Init.MCLKOutput = I2S_MCLKOUTPUT_DISABLE;
-  hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_96K;
+  hi2s3.Init.AudioFreq = I2S_AUDIOFREQ_48K;
   hi2s3.Init.CPOL = I2S_CPOL_LOW;
   hi2s3.Init.ClockSource = I2S_CLOCK_PLL;
   hi2s3.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_ENABLE;
@@ -440,19 +451,26 @@ static void MX_GPIO_Init(void)
 void HAL_I2SEx_TxRxHalfCpltCallback(I2S_HandleTypeDef *hi2s) {
         if (hi2s->Instance == SPI3) {
                 HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
-                for (int i = 0; i < I2S_BUF_HALFWORDS / 2; i++) {
-                        i2s_tx_buf[i] = i2s_rx_buf[i];
-                }
+                Audio_Process(&i2s_tx_buf[0], &i2s_rx_buf[0], I2S_BUF_HALFWORDS / 2);
         }
   }
 
 void HAL_I2SEx_TxRxCpltCallback(I2S_HandleTypeDef *hi2s) {
 	if (hi2s->Instance == SPI3) {
 			HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
-			for (int i = I2S_BUF_HALFWORDS / 2; i < I2S_BUF_HALFWORDS; i++) {
-					i2s_tx_buf[i] = i2s_rx_buf[i];
-			}
+			Audio_Process(&i2s_tx_buf[I2S_BUF_HALFWORDS / 2],
+			                            &i2s_rx_buf[I2S_BUF_HALFWORDS / 2],
+			                            I2S_BUF_HALFWORDS / 2);
 	}
+}
+
+void HAL_I2S_ErrorCallback(I2S_HandleTypeDef *hi2s)
+{
+    if (hi2s->Instance == SPI3) {
+        i2s_last_error = hi2s->ErrorCode;
+        i2s_error_count++;
+        i2s_error_flag = 1;
+    }
 }
 /* USER CODE END 4 */
 
