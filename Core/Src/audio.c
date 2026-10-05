@@ -1,49 +1,11 @@
 #include "audio.h"
 
-/* Struktura 2-biegunowego filtru IIR (Biquad Direct Form 1) */
-typedef struct {
-    float b0, b1, b2;
-    float a1, a2;
-    float x1, x2;
-    float y1, y2;
-} BiquadFilter;
+volatile float drive = 60.0f;
+volatile float clip_level = 1500.0f;
 
-static BiquadFilter lpf_l = {0};
-static BiquadFilter lpf_r = {0};
+void Distortion_Init(void) // TODO: Distortion proper initialization with parameters
+{}
 
-volatile float drive = 20.0f;
-volatile float clip_level = 500.0f;
-
-/* Inicjalizacja filtru dolnoprzepustowego Butterwortha 2. rzędu (odcięcie 4.5 kHz przy fs = 48 kHz) */
-void Distortion_Init(void)
-{
-    // Współczynniki przeliczone dla fs = 48 kHz, fc = 4500 Hz, Q = 0.707 (Butterworth)
-    const float b0 = 0.06050f;
-    const float b1 = 0.12100f;
-    const float b2 = 0.06050f;
-    const float a1 = -1.19393f;
-    const float a2 = 0.43592f;
-
-    lpf_l.b0 = b0; lpf_l.b1 = b1; lpf_l.b2 = b2;
-    lpf_l.a1 = a1; lpf_l.a2 = a2;
-
-    lpf_r.b0 = b0; lpf_r.b1 = b1; lpf_r.b2 = b2;
-    lpf_r.a1 = a1; lpf_r.a2 = a2;
-}
-
-/* Szybkie przetwarzanie jednej próbki przez filtr IIR */
-static inline float Biquad_Process(BiquadFilter *f, float in)
-{
-    float out = (f->b0 * in) + (f->b1 * f->x1) + (f->b2 * f->x2) - (f->a1 * f->y1) - (f->a2 * f->y2);
-
-    // Przesunięcie historii
-    f->x2 = f->x1;
-    f->x1 = in;
-    f->y2 = f->y1;
-    f->y1 = out;
-
-    return out;
-}
 /* Nie używana implementacja
 static inline void FX_Dist(float x_l, float x_r, float tight_l, float tight_r, float drive, float clip_level)
 {
@@ -59,14 +21,8 @@ static inline void FX_Dist(float x_l, float x_r, float tight_l, float tight_r, f
 */
 void Audio_Process(volatile int16_t *pOut, volatile int16_t *pIn, uint16_t length)
 {
-	// PARAMETRY BRZMIENIA:
-	           // Siła przesteru (20.0 - 60.0)
-	    // Poziom obcięcia fali
 
-	// 1. Filtr górnoprzepustowy (HPF) PRZED przesterem:
-	// Odcina sub-bas i dudnienie (~300 Hz przy fs = 48 kHz, tak samo jak 0.02 przy 96 kHz)
-	// Zwiększ hpf_alpha, żeby jeszcze bardziej odchudzić bas
-	const float hpf_alpha = 0.039f;
+	const float hpf_alpha = 0.05f;
 	static float hpf_dc_l = 0.0f;
 	static float hpf_dc_r = 0.0f;
 
