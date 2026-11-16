@@ -59,6 +59,7 @@ All parameters live in `audio_params` (`Core/Inc/audio.h`, all `float`) — edit
 | `reverb_mix` | 0 .. 1 | 0.3 |
 | `reverb_decay` | 0 .. 1 | 0.5 |
 | `linvol` | 0 .. 23 (codec input gain, 15 = -12 dB) | 15 |
+| `out_db` | -40 .. 0 dB (codec headphone out, analog; ~-20 for a guitar amp input) | -20 |
 
 Button B1 cycles CLEAN → DIST → CHORUS → ECHO → REVERB, LEDs show the active effects.
 

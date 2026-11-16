@@ -25,6 +25,7 @@ volatile AudioParams audio_params = {
 	.reverb_mix         = 0.3f,
 	.reverb_decay       = 0.5f,     // ogon ~2.2 s
 	.linvol             = 15,       // -12 dB
+	.out_db             = -20,      // wejście wzmacniacza gitarowego (0 = poziom liniowy)
 	.fft                = 0,
 };
 

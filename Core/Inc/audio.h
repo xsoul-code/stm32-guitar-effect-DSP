@@ -39,6 +39,7 @@ typedef struct {
 	float reverb_decay;         // 0 .. 1 -> ogon ~1 .. ~15 s
 	// KODEK / ESP32
 	float linvol;               // wzmocnienie wejścia kodeka 0 .. 23 (15 = -12 dB, 23 = 0 dB)
+	float out_db;               // wyjście słuchawkowe kodeka -40 .. 0 dB (0 = linia, ~-20 = wejście wzmacniacza gitarowego)
 	float fft;                  // 1 = widmo do ESP32 co 100 ms
 } AudioParams;
 

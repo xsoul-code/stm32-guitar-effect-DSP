@@ -48,6 +48,12 @@ HAL_StatusTypeDef WM8731_SetLineInVolume(I2C_HandleTypeDef *hi2c, uint8_t vol)
     return WM8731_WriteReg(hi2c, WM8731_REG_LLINEIN, 0x100 | (vol & 0x1F));
 }
 
+/* Headphone out L+R (LRHPBOTH), zero-cross (LZCEN), volume 0x79 + db (0x79 = 0 dB, 1 dB steps). */
+HAL_StatusTypeDef WM8731_SetHeadphoneVolume(I2C_HandleTypeDef *hi2c, int8_t db)
+{
+    return WM8731_WriteReg(hi2c, WM8731_REG_LHPOUT, 0x100 | 0x80 | (0x79 + db));
+}
+
 HAL_StatusTypeDef WM8731_Init(I2C_HandleTypeDef *hi2c)
 {
     HAL_StatusTypeDef st;
