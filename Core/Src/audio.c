@@ -12,6 +12,7 @@ volatile AudioParams audio_params = {
 	.clean_gain         = 20.0f,    // ~poziom DIST przy typowym graniu
 	.drive              = 60.0f,
 	.clip_level         = 1500.0f,
+	.linvol             = 15,       // -12 dB
 };
 
 volatile uint32_t dbg_cycles_max = 0;   // max cykli CPU na jedno Audio_Process (podgląd w debuggerze)
@@ -77,7 +78,7 @@ static Biquad EQ_Peak(float f0, float gain_db, float Q) // source: [BristowJohns
 	return q;
 }
 
-// Pętla główna: współczynniki EQ liczone tylko po zmianie parametrów (cos, sin, pow są za wolne
+// Pętla główna: współczynniki EQ liczone tylko po zmianie gałek (cos, sin, pow są za wolne
 // na każdą próbkę)
 void Audio_Update(void)
 {
@@ -114,6 +115,11 @@ void Audio_Init(void)
 	CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
 	DWT->CYCCNT = 0;
 	DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
+void Audio_NextEffect(void)
+{
+	audio_params.fx_dist = !audio_params.fx_dist;     // CLEAN <-> DIST
 }
 
 // Wszystko liczy się zawsze, przełączniki to tylko płynne miksy. Przerwanie trwa wtedy

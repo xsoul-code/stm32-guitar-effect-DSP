@@ -42,6 +42,12 @@ HAL_StatusTypeDef WM8731_SyncInit(I2C_HandleTypeDef *hi2c)
 	 return HAL_OK;
 }
 
+/* Line-in L+R (LRINBOTH), unmute. vol: 0x00 = -34.5 dB .. 0x17 = 0 dB .. 0x1F = +12 dB, 1.5 dB steps. */
+HAL_StatusTypeDef WM8731_SetLineInVolume(I2C_HandleTypeDef *hi2c, uint8_t vol)
+{
+    return WM8731_WriteReg(hi2c, WM8731_REG_LLINEIN, 0x100 | (vol & 0x1F));
+}
+
 HAL_StatusTypeDef WM8731_Init(I2C_HandleTypeDef *hi2c)
 {
     HAL_StatusTypeDef st;

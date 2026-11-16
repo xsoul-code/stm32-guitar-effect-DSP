@@ -24,6 +24,7 @@
 #include "wm8731.h"
 #include <string.h>
 #include "audio.h"
+#include "esp32.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -62,6 +63,9 @@ volatile uint32_t i2s_error_count = 0;
 volatile uint32_t i2s_last_error = 0;
 
 volatile uint32_t cnt_fre = 0, cnt_udr = 0, cnt_ovr = 0;
+
+static uint8_t codec_fault = 0;      // błąd inicjalizacji kodeka (niebieska LED)
+static uint8_t linvol_set = 0xFF;    // linvol zapisany w kodeku, 0xFF = zapisz jeszcze raz
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -88,6 +92,7 @@ static void Audio_Restart(void)
     memset((void*)i2s_rx_buf, 0, sizeof(i2s_rx_buf));
 
     WM8731_Init(&hi2c1);
+    linvol_set = 0xFF;   // reset kodeka przywrócił domyślne wzmocnienie wejścia
 
     __HAL_RCC_SPI3_FORCE_RESET();
     __HAL_RCC_SPI3_RELEASE_RESET();
@@ -147,6 +152,7 @@ int main(void)
 
   if (WM8731_Init(&hi2c1) != HAL_OK) {
 	  GPIOD->ODR |= (1 << 15);
+	  codec_fault = 1;
   }
 
   __HAL_RCC_SPI3_FORCE_RESET();
@@ -167,7 +173,11 @@ int main(void)
 
   if (WM8731_SyncInit(&hi2c1) != HAL_OK) {
   	  GPIOD->ODR |= (1 << 15);
+  	  codec_fault = 1;
     }
+
+  // UART do ESP32 (USART3 PD8/PD9), wysyła "HELLO"
+  ESP32_Init();
 
   /* USER CODE END 2 */
 
@@ -189,10 +199,38 @@ int main(void)
 	      Audio_Restart();
 	  }
 
+	  // komendy z ESP32
+	  ESP32_Poll();
+
 	  // nowe współczynniki filtrów, gdy zmieniły się parametry
 	  Audio_Update();
 
-    HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+	  // wzmocnienie wejścia kodeka, tylko po zmianie (nigdy ponad 0 dB - ADC kodeka się zawiesza)
+	  uint8_t linvol = (uint8_t)audio_params.linvol;
+	  if (linvol > WM8731_LINVOL_MAX) linvol = WM8731_LINVOL_MAX;
+	  if (linvol != linvol_set) {
+		  if (WM8731_SetLineInVolume(&hi2c1, linvol) == HAL_OK)
+			  linvol_set = linvol;
+	  }
+
+	  // przycisk B1 (PA0): następny efekt przy wciśnięciu (zbocze 0 -> 1).
+	  // Odczyt co ~10 ms, więc drgania styków się nie liczą
+	  static uint8_t btn_prev = 0;
+	  uint8_t btn = (GPIOA->IDR & GPIO_PIN_0) != 0;
+	  if (btn && !btn_prev) {
+		  Audio_NextEffect();
+		  ESP32_SendParam("fx_dist");
+	  }
+	  btn_prev = btn;
+
+	  // diody = włączone efekty (w bypassie zgaszone): zielona DIST; niebieska = błąd kodeka
+	  uint32_t leds = 0;
+	  if (!audio_params.bypass) {
+		  if (audio_params.fx_dist) leds |= (1 << 12);
+	  }
+	  if (codec_fault) leds |= (1 << 15);
+	  GPIOD->ODR = (GPIOD->ODR & ~(0xFUL << 12)) | leds;
+
     HAL_Delay(10);
 
 

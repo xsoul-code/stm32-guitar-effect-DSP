@@ -8,10 +8,11 @@
 #define PI 3.14159265f
 #define SMOOTH 0.001f       // wygładzanie parametrów, ~20 ms przy 48 kHz (bez skoków = bez trzasków)
 
-// Wszystkie parametry pedału. Zmieniane z debuggera (Live Expressions: audio_params).
+// Wszystkie parametry pedału. Zmieniane z debuggera (Live Expressions: audio_params)
+// i przez UART z ESP32 (esp32.c). Zakresy jak w tabeli w esp32.c.
 // Tor: wejście L -> [CLEAN | DIST] -> EQ -> VOLUME -> limiter -> L/R
 typedef struct {
-	// przełączniki 0 / 1
+	// przełączniki 0 / 1 (float, żeby wszystkie parametry były jednego typu)
 	float bypass;               // 1 = wejście prosto na wyjście
 	float fx_dist;              // 1 = przester, 0 = czysty tor (clean_gain)
 	float volume;               // 0 .. 1
@@ -23,12 +24,15 @@ typedef struct {
 	// DIST
 	float drive;                // 1 .. 200
 	float clip_level;           // 100 .. 30000 (clip symetryczny +-clip_level)
+	// KODEK
+	float linvol;               // wzmocnienie wejścia kodeka 0 .. 23 (15 = -12 dB, 23 = 0 dB)
 } AudioParams;
 
 extern volatile AudioParams audio_params;
 
 void Audio_Init(void);
 void Audio_Process(volatile int16_t *pOut, volatile int16_t *pIn, uint16_t length);
-void Audio_Update(void);        // pętla główna: przelicza współczynniki EQ po zmianie parametrów
+void Audio_Update(void);        // pętla główna: przelicza współczynniki EQ po zmianie gałek
+void Audio_NextEffect(void);    // przycisk: CLEAN <-> DIST
 
 #endif

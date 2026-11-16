@@ -22,6 +22,13 @@ HAL_StatusTypeDef WM8731_Init(I2C_HandleTypeDef *hi2c);
 
 HAL_StatusTypeDef WM8731_SyncInit(I2C_HandleTypeDef *hi2c);
 
+/* Line-in gain for both channels: 0x00 = -34.5 dB .. 0x17 = 0 dB .. 0x1F = +12 dB. */
+HAL_StatusTypeDef WM8731_SetLineInVolume(I2C_HandleTypeDef *hi2c, uint8_t vol);
+
+/* Highest safe line-in gain on this board (0 dB). Above it the input overloads
+   and the codec ADC locks up (constant output) until reset. */
+#define WM8731_LINVOL_MAX   0x17
+
 #ifdef __cplusplus
 }
 #endif
