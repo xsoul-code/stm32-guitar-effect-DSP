@@ -67,6 +67,7 @@ volatile uint32_t cnt_fre = 0, cnt_udr = 0, cnt_ovr = 0;
 
 static uint8_t codec_fault = 0;      // błąd inicjalizacji kodeka (niebieska LED)
 static uint8_t linvol_set = 0xFF;    // linvol zapisany w kodeku, 0xFF = zapisz jeszcze raz
+static int8_t out_db_set = 0;        // out_db zapisany w kodeku (WM8731_Init ustawia 0 dB)
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -94,6 +95,7 @@ static void Audio_Restart(void)
 
     WM8731_Init(&hi2c1);
     linvol_set = 0xFF;   // reset kodeka przywrócił domyślne wzmocnienie wejścia
+    out_db_set = 0;      // i wyjście 0 dB
 
     __HAL_RCC_SPI3_FORCE_RESET();
     __HAL_RCC_SPI3_RELEASE_RESET();
@@ -212,6 +214,14 @@ int main(void)
 	  if (linvol != linvol_set) {
 		  if (WM8731_SetLineInVolume(&hi2c1, linvol) == HAL_OK)
 			  linvol_set = linvol;
+	  }
+
+	  // głośność wyjścia słuchawkowego, tylko po zmianie. Tłumienie analogowe w kodeku (za DAC),
+	  // więc szum DAC spada razem z sygnałem - inaczej niż przy cyfrowym volume
+	  int8_t out_db = (int8_t)audio_params.out_db;
+	  if (out_db != out_db_set) {
+		  if (WM8731_SetHeadphoneVolume(&hi2c1, out_db) == HAL_OK)
+			  out_db_set = out_db;
 	  }
 
 	  // przycisk B1 (PA0): następny efekt przy wciśnięciu (zbocze 0 -> 1).

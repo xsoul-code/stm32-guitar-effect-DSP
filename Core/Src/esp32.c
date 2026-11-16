@@ -44,6 +44,7 @@ static const Param params[] = {
 	{ "reverb_mix",     &audio_params.reverb_mix,     0, 1 },
 	{ "reverb_decay",   &audio_params.reverb_decay,   0, 1 },
 	{ "linvol",         &audio_params.linvol,         0, WM8731_LINVOL_MAX },
+	{ "out_db",         &audio_params.out_db,         -40, 0 },
 	{ "fft",            &audio_params.fft,            0, 1 },
 };
 #define N_PARAMS (sizeof(params) / sizeof(params[0]))
@@ -164,7 +165,7 @@ void ESP32_Init(void)
 
 	// Od resetu do tej chwili (~220 ms, start kodeka) PD8 nie jest jeszcze wyjściem i linia pływa -
 	// ESP32 zbiera śmieci bez '\n'. Pierwsze '\n' kończy tę linię, więc HELLO dochodzi czyste.
-	Send("\nHELLO 4\n");
+	Send("\nHELLO 5\n");
 }
 
 void ESP32_Poll(void)

@@ -45,10 +45,10 @@ All parameters live in `audio_params` (`Core/Inc/audio.h`, all `float`) — edit
 
 | Parameter | Range | Default |
 |---|---|---|
-| `bypass`, `fx_dist`, `fx_chorus`, `fx_echo`, `fx_reverb`, `fft` | 0 / 1 | 0, 1, 0, 0, 0, 0 |
+| `bypass`, `fx_dist`, `fx_chorus`, `fx_echo`, `fx_reverb`, `fft` | 0 / 1 | 0 |
 | `volume` | 0 .. 1 | 1 |
 | `eq_low_db`, `eq_mid_db`, `eq_high_db` | -12 .. 12 dB | 0 |
-| `clean_gain` | 0 .. 64 | 20 |
+| `clean_gain` | 0 .. 64 | 14.5 |
 | `drive` | 1 .. 200 | 60 |
 | `clip_level` | 100 .. 30000 | 1500 |
 | `chorus_rate_hz` | 0.05 .. 5 | 0.9 |
@@ -58,7 +58,8 @@ All parameters live in `audio_params` (`Core/Inc/audio.h`, all `float`) — edit
 | `echo_mix` | 0 .. 1 | 0.35 |
 | `reverb_mix` | 0 .. 1 | 0.3 |
 | `reverb_decay` | 0 .. 1 | 0.5 |
-| `linvol` | 0 .. 23 (codec input gain, 15 = -12 dB) | 15 |
+| `linvol` | 0 .. 23 (codec input gain, 15 = -12 dB) | 12 |
+| `out_db` | -40 .. 0 dB (codec headphone out, analog; ~-30 for a guitar amp input) | -30 |
 
 Button B1 cycles CLEAN → DIST → CHORUS → ECHO → REVERB, LEDs show the active effects.
 
