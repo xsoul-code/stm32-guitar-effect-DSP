@@ -221,6 +221,7 @@ int main(void)
 	  if (btn && !btn_prev) {
 		  Audio_NextEffect();
 		  ESP32_SendParam("fx_dist");
+		  ESP32_SendParam("fx_chorus");
 	  }
 	  btn_prev = btn;
 
@@ -233,10 +234,11 @@ int main(void)
 		  ESP32_SendFFT(bands);
 	  }
 
-	  // diody = włączone efekty (w bypassie zgaszone): zielona DIST; niebieska = błąd kodeka
+	  // diody = włączone efekty (w bypassie zgaszone): zielona DIST, pomarańczowa CHORUS; niebieska = błąd kodeka
 	  uint32_t leds = 0;
 	  if (!audio_params.bypass) {
-		  if (audio_params.fx_dist) leds |= (1 << 12);
+		  if (audio_params.fx_dist)   leds |= (1 << 12);
+		  if (audio_params.fx_chorus) leds |= (1 << 13);
 	  }
 	  if (codec_fault) leds |= (1 << 15);
 	  GPIOD->ODR = (GPIOD->ODR & ~(0xFUL << 12)) | leds;

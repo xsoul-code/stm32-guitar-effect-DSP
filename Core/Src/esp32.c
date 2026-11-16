@@ -26,6 +26,7 @@ typedef struct {
 static const Param params[] = {
 	{ "bypass",         &audio_params.bypass,         0, 1 },
 	{ "fx_dist",        &audio_params.fx_dist,        0, 1 },
+	{ "fx_chorus",      &audio_params.fx_chorus,      0, 1 },
 	{ "volume",         &audio_params.volume,         0, 1 },
 	{ "eq_low_db",      &audio_params.eq_low_db,      -12, 12 },
 	{ "eq_mid_db",      &audio_params.eq_mid_db,      -12, 12 },
@@ -33,6 +34,8 @@ static const Param params[] = {
 	{ "clean_gain",     &audio_params.clean_gain,     0, 64 },
 	{ "drive",          &audio_params.drive,          1, 200 },
 	{ "clip_level",     &audio_params.clip_level,     100, 30000 },
+	{ "chorus_rate_hz", &audio_params.chorus_rate_hz, 0.05f, 5 },
+	{ "chorus_depth",   &audio_params.chorus_depth,   0, 1 },
 	{ "linvol",         &audio_params.linvol,         0, WM8731_LINVOL_MAX },
 	{ "fft",            &audio_params.fft,            0, 1 },
 };

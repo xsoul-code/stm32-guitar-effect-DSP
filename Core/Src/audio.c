@@ -1,11 +1,13 @@
 #include "audio.h"
 #include "fft.h"
+#include "effects.h"
 #include "stm32f4xx.h"
 #include <string.h>
 
 volatile AudioParams audio_params = {
 	.bypass             = 0,
 	.fx_dist            = 1,
+	.fx_chorus          = 0,
 	.volume             = 1.0f,
 	.eq_low_db          = 0.0f,
 	.eq_mid_db          = 0.0f,
@@ -13,6 +15,8 @@ volatile AudioParams audio_params = {
 	.clean_gain         = 20.0f,    // ~poziom DIST przy typowym graniu
 	.drive              = 60.0f,
 	.clip_level         = 1500.0f,
+	.chorus_rate_hz     = 0.9f,     // jak EHX Small Clone
+	.chorus_depth       = 0.5f,
 	.linvol             = 15,       // -12 dB
 	.fft                = 0,
 };
@@ -104,6 +108,7 @@ void Audio_Update(void)
 
 void Audio_Init(void)
 {
+	Chorus_Init();
 	Audio_Update();
 
 	drive_s  = audio_params.drive;
@@ -121,7 +126,14 @@ void Audio_Init(void)
 
 void Audio_NextEffect(void)
 {
-	audio_params.fx_dist = !audio_params.fx_dist;     // CLEAN <-> DIST
+	// 0 CLEAN, 1 DIST, 2 CHORUS - skąd idziemy (efekt mógł ustawić ESP32)
+	uint8_t effect = 0;
+	if (audio_params.fx_dist)   effect = 1;
+	if (audio_params.fx_chorus) effect = 2;
+
+	effect = (effect + 1) % 3;
+	audio_params.fx_dist   = (effect == 1);
+	audio_params.fx_chorus = (effect == 2);
 }
 
 // Wszystko liczy się zawsze, przełączniki to tylko płynne miksy. Przerwanie trwa wtedy
@@ -204,8 +216,7 @@ void Audio_Process(volatile int16_t *pOut, volatile int16_t *pIn, uint16_t lengt
 		}
 
 		// --- KROK 7: EFEKTY ---
-		// TODO
-		float out = y;
+		float out = Chorus_Process(y);
 
 		// --- KROK 8: GŁOŚNOŚĆ, BYPASS, OGRANICZNIK ---
 		out *= vol_s;
