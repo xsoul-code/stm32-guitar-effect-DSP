@@ -6,7 +6,7 @@
 
 volatile AudioParams audio_params = {
 	.bypass             = 0,
-	.fx_dist            = 1,
+	.fx_dist            = 0,        // po włączeniu czysty dźwięk (przester jest najgłośniejszy)
 	.fx_chorus          = 0,
 	.fx_echo            = 0,
 	.fx_reverb          = 0,
@@ -14,7 +14,7 @@ volatile AudioParams audio_params = {
 	.eq_low_db          = 0.0f,
 	.eq_mid_db          = 0.0f,
 	.eq_high_db         = 0.0f,
-	.clean_gain         = 20.0f,    // ~poziom DIST przy typowym graniu
+	.clean_gain         = 14.5f,    // ustawione ze słuchu (frontend + wzmacniacz)
 	.drive              = 60.0f,
 	.clip_level         = 1500.0f,
 	.chorus_rate_hz     = 0.9f,     // jak EHX Small Clone
@@ -24,8 +24,8 @@ volatile AudioParams audio_params = {
 	.echo_mix           = 0.35f,
 	.reverb_mix         = 0.3f,
 	.reverb_decay       = 0.5f,     // ogon ~2.2 s
-	.linvol             = 15,       // -12 dB
-	.out_db             = -20,      // wejście wzmacniacza gitarowego (0 = poziom liniowy)
+	.linvol             = 12,       // -16.5 dB
+	.out_db             = -30,      // wejście wzmacniacza gitarowego (0 = poziom liniowy)
 	.fft                = 0,
 };
 
