@@ -1,4 +1,5 @@
 #include "audio.h"
+#include "fft.h"
 #include "stm32f4xx.h"
 #include <string.h>
 
@@ -13,6 +14,7 @@ volatile AudioParams audio_params = {
 	.drive              = 60.0f,
 	.clip_level         = 1500.0f,
 	.linvol             = 15,       // -12 dB
+	.fft                = 0,
 };
 
 volatile uint32_t dbg_cycles_max = 0;   // max cykli CPU na jedno Audio_Process (podgląd w debuggerze)
@@ -211,6 +213,9 @@ void Audio_Process(volatile int16_t *pOut, volatile int16_t *pIn, uint16_t lengt
 		out = fminf(fmaxf(out, -32000.0f), 32000.0f);      // twarde obcięcie tuż pod pełną skalą
 		pOut[i]     = (int16_t)out;                         // mono: ten sam sygnał na L i R
 		pOut[i + 1] = (int16_t)out;
+
+		// --- KROK 9: PRÓBKA DO WIDMA (FFT dla ESP32) ---
+		FFT_Push(out);
 	}
 
 	uint32_t dt = DWT->CYCCNT - t0;

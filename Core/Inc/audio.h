@@ -24,8 +24,9 @@ typedef struct {
 	// DIST
 	float drive;                // 1 .. 200
 	float clip_level;           // 100 .. 30000 (clip symetryczny +-clip_level)
-	// KODEK
+	// KODEK / ESP32
 	float linvol;               // wzmocnienie wejścia kodeka 0 .. 23 (15 = -12 dB, 23 = 0 dB)
+	float fft;                  // 1 = widmo do ESP32 co 100 ms
 } AudioParams;
 
 extern volatile AudioParams audio_params;

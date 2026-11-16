@@ -25,6 +25,7 @@
 #include <string.h>
 #include "audio.h"
 #include "esp32.h"
+#include "fft.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -222,6 +223,15 @@ int main(void)
 		  ESP32_SendParam("fx_dist");
 	  }
 	  btn_prev = btn;
+
+	  // widmo wyjścia do ESP32 co 100 ms (włączane z ESP32: "SET fft 1")
+	  static uint32_t fft_time = 0;
+	  if (audio_params.fft && HAL_GetTick() - fft_time >= 100) {
+		  fft_time = HAL_GetTick();
+		  uint8_t bands[FFT_BANDS];
+		  FFT_Bands(bands);
+		  ESP32_SendFFT(bands);
+	  }
 
 	  // diody = włączone efekty (w bypassie zgaszone): zielona DIST; niebieska = błąd kodeka
 	  uint32_t leds = 0;

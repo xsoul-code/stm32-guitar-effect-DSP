@@ -10,5 +10,6 @@
 void ESP32_Init(void);                      // USART3 115200 8N1 + "HELLO"
 void ESP32_Poll(void);                      // odebrane linie -> komendy (PING, SET, GET)
 void ESP32_SendParam(const char *name);     // "VAL <name> <wartość>" po zmianie lokalnej (przycisk)
+void ESP32_SendFFT(const uint8_t *bands);   // "FFT v1 ... v16" (gdy fft = 1, co 100 ms)
 
 #endif

@@ -1,5 +1,6 @@
 #include "esp32.h"
 #include "audio.h"
+#include "fft.h"
 #include "wm8731.h"
 #include "main.h"
 #include <stdio.h>
@@ -33,6 +34,7 @@ static const Param params[] = {
 	{ "drive",          &audio_params.drive,          1, 200 },
 	{ "clip_level",     &audio_params.clip_level,     100, 30000 },
 	{ "linvol",         &audio_params.linvol,         0, WM8731_LINVOL_MAX },
+	{ "fft",            &audio_params.fft,            0, 1 },
 };
 #define N_PARAMS (sizeof(params) / sizeof(params[0]))
 
@@ -180,3 +182,13 @@ void ESP32_SendParam(const char *name)
 	if (p) SendVal(p);
 }
 
+// "FFT v1 ... v16" - 16 pasm widma, każde 0..99 (dBFS + 99), max 52 B
+void ESP32_SendFFT(const uint8_t *bands)
+{
+	char buf[LINE_LEN + 1];
+	int n = snprintf(buf, sizeof(buf), "FFT");
+	for (int b = 0; b < FFT_BANDS; b++)
+		n += snprintf(buf + n, sizeof(buf) - n, " %d", bands[b]);
+	snprintf(buf + n, sizeof(buf) - n, "\n");
+	Send(buf);
+}
