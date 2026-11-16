@@ -8,6 +8,7 @@ volatile AudioParams audio_params = {
 	.bypass             = 0,
 	.fx_dist            = 1,
 	.fx_chorus          = 0,
+	.fx_echo            = 0,
 	.volume             = 1.0f,
 	.eq_low_db          = 0.0f,
 	.eq_mid_db          = 0.0f,
@@ -17,13 +18,16 @@ volatile AudioParams audio_params = {
 	.clip_level         = 1500.0f,
 	.chorus_rate_hz     = 0.9f,     // jak EHX Small Clone
 	.chorus_depth       = 0.5f,
+	.echo_time_ms       = 380.0f,
+	.echo_feedback      = 0.35f,
+	.echo_mix           = 0.35f,
 	.linvol             = 15,       // -12 dB
 	.fft                = 0,
 };
 
 volatile uint32_t dbg_cycles_max = 0;   // max cykli CPU na jedno Audio_Process (podgląd w debuggerze)
 
-#define MIX_HEADROOM 0.5f       // -6 dB zapasu za przesterem, EQ może podbić o +12 dB
+#define MIX_HEADROOM 0.5f       // -6 dB zapasu za przesterem, inaczej DIST + echo dobija do limitera
 
 // Wygładzone parametry
 static float drive_s, clean_s, clip_s, vol_s, dist_s, bypass_s;
@@ -109,6 +113,7 @@ void Audio_Update(void)
 void Audio_Init(void)
 {
 	Chorus_Init();
+	Echo_Init();
 	Audio_Update();
 
 	drive_s  = audio_params.drive;
@@ -126,14 +131,16 @@ void Audio_Init(void)
 
 void Audio_NextEffect(void)
 {
-	// 0 CLEAN, 1 DIST, 2 CHORUS - skąd idziemy (efekt mógł ustawić ESP32)
+	// 0 CLEAN, 1 DIST, 2 CHORUS, 3 ECHO - skąd idziemy (efekt mógł ustawić ESP32)
 	uint8_t effect = 0;
 	if (audio_params.fx_dist)   effect = 1;
 	if (audio_params.fx_chorus) effect = 2;
+	if (audio_params.fx_echo)   effect = 3;
 
-	effect = (effect + 1) % 3;
+	effect = (effect + 1) % 4;
 	audio_params.fx_dist   = (effect == 1);
 	audio_params.fx_chorus = (effect == 2);
+	audio_params.fx_echo   = (effect == 3);
 }
 
 // Wszystko liczy się zawsze, przełączniki to tylko płynne miksy. Przerwanie trwa wtedy
@@ -216,7 +223,9 @@ void Audio_Process(volatile int16_t *pOut, volatile int16_t *pIn, uint16_t lengt
 		}
 
 		// --- KROK 7: EFEKTY ---
-		float out = Chorus_Process(y);
+		float ch = Chorus_Process(y);
+		float echo = Echo_Process(ch);
+		float out = ch + echo;
 
 		// --- KROK 8: GŁOŚNOŚĆ, BYPASS, OGRANICZNIK ---
 		out *= vol_s;

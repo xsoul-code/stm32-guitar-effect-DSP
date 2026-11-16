@@ -9,4 +9,7 @@
 void Chorus_Init(void);
 float Chorus_Process(float x);                              // zwraca suchy + mokry (mix)
 
+void Echo_Init(void);
+float Echo_Process(float x);                                // zwraca same powtórzenia (do dodania)
+
 #endif
