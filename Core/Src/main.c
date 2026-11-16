@@ -223,6 +223,7 @@ int main(void)
 		  ESP32_SendParam("fx_dist");
 		  ESP32_SendParam("fx_chorus");
 		  ESP32_SendParam("fx_echo");
+		  ESP32_SendParam("fx_reverb");
 	  }
 	  btn_prev = btn;
 
@@ -235,12 +236,14 @@ int main(void)
 		  ESP32_SendFFT(bands);
 	  }
 
-	  // diody = włączone efekty (w bypassie zgaszone): zielona DIST, pomarańczowa CHORUS, czerwona ECHO; niebieska = błąd kodeka
+	  // diody = włączone efekty (w bypassie zgaszone): zielona DIST, pomarańczowa CHORUS,
+	  // czerwona ECHO, niebieska REVERB (niebieska świeci też przy błędzie kodeka)
 	  uint32_t leds = 0;
 	  if (!audio_params.bypass) {
 		  if (audio_params.fx_dist)   leds |= (1 << 12);
 		  if (audio_params.fx_chorus) leds |= (1 << 13);
 		  if (audio_params.fx_echo)   leds |= (1 << 14);
+		  if (audio_params.fx_reverb) leds |= (1 << 15);
 	  }
 	  if (codec_fault) leds |= (1 << 15);
 	  GPIOD->ODR = (GPIOD->ODR & ~(0xFUL << 12)) | leds;

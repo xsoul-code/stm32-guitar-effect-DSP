@@ -12,4 +12,7 @@ float Chorus_Process(float x);                              // zwraca suchy + mo
 void Echo_Init(void);
 float Echo_Process(float x);                                // zwraca same powtórzenia (do dodania)
 
+void Reverb_Init(void);
+float Reverb_Process(float x);                              // zwraca sam ogon (do dodania)
+
 #endif
