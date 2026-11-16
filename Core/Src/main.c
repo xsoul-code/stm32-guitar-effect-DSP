@@ -139,7 +139,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_NVIC_SetPriority(SPI3_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(SPI3_IRQn);
-  Distortion_Init(); // TODO: Distortion proper initialization with parameters
+  Audio_Init();
   HAL_Delay(5);
 
   memset((void*)i2s_tx_buf, 0, sizeof(i2s_tx_buf));
@@ -188,6 +188,9 @@ int main(void)
 	      cnt_fre = 0;
 	      Audio_Restart();
 	  }
+
+	  // nowe współczynniki filtrów, gdy zmieniły się parametry
+	  Audio_Update();
 
     HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
     HAL_Delay(10);
