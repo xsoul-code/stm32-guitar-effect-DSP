@@ -24,6 +24,8 @@
 #include "wm8731.h"
 #include <string.h>
 #include "audio.h"
+#include "esp32.h"
+#include "fft.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,16 +51,22 @@ DMA_HandleTypeDef hdma_spi3_tx;
 DMA_HandleTypeDef hdma_i2s3_ext_rx;
 
 /* USER CODE BEGIN PV */
-#define I2S_BUF_HALFWORDS 256
+// 4 ramki stereo = 8 półsłów -> przerwanie co 2 ramki (24 kHz). Przy 256 (64 ramki na połówkę)
+// CPU pracował zrywami co 1.33 ms i to wchodziło do ADC kodeka jako pisk 750 Hz + harmoniczne.
+// Teraz zakłócenia lądują na 24 kHz, poza pasmem.
+#define I2S_BUF_HALFWORDS 8
 volatile int16_t i2s_rx_buf[I2S_BUF_HALFWORDS];
 volatile int16_t i2s_tx_buf[I2S_BUF_HALFWORDS];
-static volatile uint8_t codec_was_lost = 0;
 
+// liczniki błędów I2S (podgląd w debuggerze)
 volatile uint8_t  i2s_error_flag = 0;
 volatile uint32_t i2s_error_count = 0;
 volatile uint32_t i2s_last_error = 0;
 
 volatile uint32_t cnt_fre = 0, cnt_udr = 0, cnt_ovr = 0;
+
+static uint8_t codec_fault = 0;      // błąd inicjalizacji kodeka (niebieska LED)
+static uint8_t linvol_set = 0xFF;    // linvol zapisany w kodeku, 0xFF = zapisz jeszcze raz
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -76,27 +84,29 @@ static void MX_I2S3_Init(void);
 
 static void Audio_Restart(void)
 {
+    // Bez przerwań audio na czas restartu (Audio_Process nie może wejść w połowie)
+    HAL_NVIC_DisableIRQ(DMA1_Stream0_IRQn);
+    HAL_NVIC_DisableIRQ(DMA1_Stream5_IRQn);
+
     HAL_I2S_DMAStop(&hi2s3);
     memset((void*)i2s_tx_buf, 0, sizeof(i2s_tx_buf));
     memset((void*)i2s_rx_buf, 0, sizeof(i2s_rx_buf));
 
     WM8731_Init(&hi2c1);
+    linvol_set = 0xFF;   // reset kodeka przywrócił domyślne wzmocnienie wejścia
 
     __HAL_RCC_SPI3_FORCE_RESET();
     __HAL_RCC_SPI3_RELEASE_RESET();
     MX_I2S3_Init();
 
+    HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+    HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+
     HAL_I2SEx_TransmitReceive_DMA(&hi2s3, (uint16_t*)i2s_tx_buf,
                                   (uint16_t*)i2s_rx_buf, I2S_BUF_HALFWORDS);
+    __HAL_DMA_DISABLE_IT(&hdma_spi3_tx, DMA_IT_TC);   // TX nie ma callbacków, jego przerwanie to tylko dodatkowe zakłócenia
     HAL_Delay(10);
     WM8731_SyncInit(&hi2c1);
-}
-
-void inline redBAD() { // Red LED blinking effect
-	GPIOD->ODR |= (1 << 14);
-	HAL_Delay(200);
-	GPIOD->ODR &=~ (1 << 14);
-	HAL_Delay(200);
 }
 
 /* USER CODE END 0 */
@@ -135,7 +145,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_NVIC_SetPriority(SPI3_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(SPI3_IRQn);
-  Distortion_Init(); // TODO: Distortion proper initialization with parameters
+  Audio_Init();
   HAL_Delay(5);
 
   memset((void*)i2s_tx_buf, 0, sizeof(i2s_tx_buf));
@@ -143,6 +153,7 @@ int main(void)
 
   if (WM8731_Init(&hi2c1) != HAL_OK) {
 	  GPIOD->ODR |= (1 << 15);
+	  codec_fault = 1;
   }
 
   __HAL_RCC_SPI3_FORCE_RESET();
@@ -157,12 +168,17 @@ int main(void)
 	  GPIOD->ODR |= (1 << 14);
         Error_Handler();
   }
+  __HAL_DMA_DISABLE_IT(&hdma_spi3_tx, DMA_IT_TC);
 
   HAL_Delay(10);
 
   if (WM8731_SyncInit(&hi2c1) != HAL_OK) {
   	  GPIOD->ODR |= (1 << 15);
+  	  codec_fault = 1;
     }
+
+  // UART do ESP32 (USART3 PD8/PD9), wysyła "HELLO"
+  ESP32_Init();
 
   /* USER CODE END 2 */
 
@@ -184,7 +200,54 @@ int main(void)
 	      Audio_Restart();
 	  }
 
-    HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);
+	  // komendy z ESP32
+	  ESP32_Poll();
+
+	  // nowe współczynniki filtrów, gdy zmieniły się parametry
+	  Audio_Update();
+
+	  // wzmocnienie wejścia kodeka, tylko po zmianie (nigdy ponad 0 dB - ADC kodeka się zawiesza)
+	  uint8_t linvol = (uint8_t)audio_params.linvol;
+	  if (linvol > WM8731_LINVOL_MAX) linvol = WM8731_LINVOL_MAX;
+	  if (linvol != linvol_set) {
+		  if (WM8731_SetLineInVolume(&hi2c1, linvol) == HAL_OK)
+			  linvol_set = linvol;
+	  }
+
+	  // przycisk B1 (PA0): następny efekt przy wciśnięciu (zbocze 0 -> 1).
+	  // Odczyt co ~10 ms, więc drgania styków się nie liczą
+	  static uint8_t btn_prev = 0;
+	  uint8_t btn = (GPIOA->IDR & GPIO_PIN_0) != 0;
+	  if (btn && !btn_prev) {
+		  Audio_NextEffect();
+		  ESP32_SendParam("fx_dist");
+		  ESP32_SendParam("fx_chorus");
+		  ESP32_SendParam("fx_echo");
+		  ESP32_SendParam("fx_reverb");
+	  }
+	  btn_prev = btn;
+
+	  // widmo wyjścia do ESP32 co 100 ms (włączane z ESP32: "SET fft 1")
+	  static uint32_t fft_time = 0;
+	  if (audio_params.fft && HAL_GetTick() - fft_time >= 100) {
+		  fft_time = HAL_GetTick();
+		  uint8_t bands[FFT_BANDS];
+		  FFT_Bands(bands);
+		  ESP32_SendFFT(bands);
+	  }
+
+	  // diody = włączone efekty (w bypassie zgaszone): zielona DIST, pomarańczowa CHORUS,
+	  // czerwona ECHO, niebieska REVERB (niebieska świeci też przy błędzie kodeka)
+	  uint32_t leds = 0;
+	  if (!audio_params.bypass) {
+		  if (audio_params.fx_dist)   leds |= (1 << 12);
+		  if (audio_params.fx_chorus) leds |= (1 << 13);
+		  if (audio_params.fx_echo)   leds |= (1 << 14);
+		  if (audio_params.fx_reverb) leds |= (1 << 15);
+	  }
+	  if (codec_fault) leds |= (1 << 15);
+	  GPIOD->ODR = (GPIOD->ODR & ~(0xFUL << 12)) | leds;
+
     HAL_Delay(10);
 
 
@@ -448,20 +511,24 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_I2SEx_TxRxHalfCpltCallback(I2S_HandleTypeDef *hi2s) {
-        if (hi2s->Instance == SPI3) {
-                HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
-                Audio_Process(&i2s_tx_buf[0], &i2s_rx_buf[0], I2S_BUF_HALFWORDS / 2);
-        }
-  }
+// Przerwanie RX DMA (DMA1_Stream0) obsługiwane samemu zamiast HAL_DMA_IRQHandler + callbacków.
+// Obie połówki bufora idą tą samą ścieżką kodu, więc CPU robi to samo co 2 ramki (24 kHz).
+// Przez HAL połówka HT i TC miały inną długość obsługi -> ton 12 kHz i więcej szumu w ADC.
+// Zwraca 0 przy błędzie DMA (TE/DME), wtedy przerwanie obsługuje HAL.
+uint32_t Audio_DMA_RxIRQ(void) // source: [RM0090] rozdz. DMA (flagi HTIF/TCIF w LISR, kasowanie w LIFCR)
+{
+    uint32_t lisr = DMA1->LISR;
 
-void HAL_I2SEx_TxRxCpltCallback(I2S_HandleTypeDef *hi2s) {
-	if (hi2s->Instance == SPI3) {
-			HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_13);
-			Audio_Process(&i2s_tx_buf[I2S_BUF_HALFWORDS / 2],
-			                            &i2s_rx_buf[I2S_BUF_HALFWORDS / 2],
-			                            I2S_BUF_HALFWORDS / 2);
-	}
+    if (lisr & (DMA_LISR_TEIF0 | DMA_LISR_DMEIF0)) return 0;
+    if (!(lisr & (DMA_LISR_HTIF0 | DMA_LISR_TCIF0))) return 0;
+
+    // TC = druga połowa bufora gotowa, HT = pierwsza
+    uint32_t half = (lisr & DMA_LISR_TCIF0) ? 1 : 0;
+    DMA1->LIFCR = half ? DMA_LIFCR_CTCIF0 : DMA_LIFCR_CHTIF0;
+
+    uint32_t off = half * (I2S_BUF_HALFWORDS / 2);
+    Audio_Process(&i2s_tx_buf[off], &i2s_rx_buf[off], I2S_BUF_HALFWORDS / 2);
+    return 1;
 }
 
 void HAL_I2S_ErrorCallback(I2S_HandleTypeDef *hi2s)
