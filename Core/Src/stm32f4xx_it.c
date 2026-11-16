@@ -205,7 +205,7 @@ void SysTick_Handler(void)
 void DMA1_Stream0_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Stream0_IRQn 0 */
-
+  if (Audio_DMA_RxIRQ()) return;   // połówki bufora audio (main.c), błędy DMA idą dalej do HAL
   /* USER CODE END DMA1_Stream0_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_i2s3_ext_rx);
   /* USER CODE BEGIN DMA1_Stream0_IRQn 1 */
